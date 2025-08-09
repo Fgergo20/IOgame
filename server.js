@@ -7,26 +7,35 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static("public"));
 
-let players = {}; // játékosok pozíciói
+let players = {};
 
 io.on("connection", (socket) => {
-    console.log("Új játékos:", socket.id);
+    console.log("Új játékos csatlakozott:", socket.id);
 
-    // új játékos kezdő pozíció
-    players[socket.id] = { x: 100, y: 100, color: getRandomColor() };
+    // név beállítása
+    socket.on("setName", (name) => {
+        players[socket.id] = {
+            x: 100, y: 100,
+            color: getRandomColor(),
+            name: name || "Névtelen"
+        };
+        socket.emit("currentPlayers", players);
+        socket.broadcast.emit("newPlayer", { id: socket.id, ...players[socket.id] });
+    });
 
-    // elküldjük neki az összes játékost
-    socket.emit("currentPlayers", players);
-
-    // mindenki máshoz is elküldjük az új játékost
-    socket.broadcast.emit("newPlayer", { id: socket.id, ...players[socket.id] });
-
-    // mozgás frissítés
+    // mozgás
     socket.on("move", (data) => {
         if (players[socket.id]) {
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
             io.emit("playerMoved", { id: socket.id, x: data.x, y: data.y });
+        }
+    });
+
+    // chat
+    socket.on("chatMessage", (msg) => {
+        if (players[socket.id]) {
+            io.emit("chatMessage", { name: players[socket.id].name, text: msg });
         }
     });
 
