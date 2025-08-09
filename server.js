@@ -19,7 +19,8 @@ io.on("connection", (socket) => {
 
     socket.on("chatMessage", (msg) => {
         if (users[socket.id]) {
-            io.emit("chatMessage", { name: users[socket.id], text: msg });
+            // Csak MÁSIK felhasználóknak küldjük
+            socket.broadcast.emit("chatMessage", { name: users[socket.id], text: msg });
         }
     });
 
