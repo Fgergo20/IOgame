@@ -2,177 +2,175 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Cartoon .io Game</title>
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartoon Chat</title>
 <script src="/socket.io/socket.io.js"></script>
 <style>
 body {
     margin: 0;
     font-family: 'Comic Sans MS', sans-serif;
-    background: #2d2d2d;
-    overflow: hidden;
+    background: #f7f0d9;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-#nameScreen, #chatPanel {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+#nameScreen, #chatScreen {
     background: #fff;
     border-radius: 15px;
     padding: 20px;
-    text-align: center;
-    z-index: 100;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    width: 95%;
+    max-width: 500px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 #nameScreen {
-    top: 30%;
+    text-align: center;
 }
 
-#nameInput {
-    padding: 10px;
+input, button {
+    padding: 12px;
     font-size: 16px;
     border-radius: 10px;
-    border: 2px solid #aaa;
+    border: none;
+    box-sizing: border-box;
 }
 
 button {
     background: #ffcc00;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 15px;
-    font-size: 16px;
-    margin-top: 10px;
     cursor: pointer;
 }
 
-#chatButton {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    background: #ff8800;
-    z-index: 50;
-}
-
-#chatPanel {
-    bottom: 70px;
-    width: 300px;
-    max-height: 300px;
-    display: none;
+#chatScreen {
+    display: flex;
     flex-direction: column;
+    height: 90vh;
 }
 
 #chatMessages {
     flex: 1;
     overflow-y: auto;
-    text-align: left;
-    font-size: 14px;
+    background: #fff8e1;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.msg {
+    padding: 8px 10px;
+    margin: 5px 0;
+    border-radius: 8px;
+    word-break: break-word;
+    max-width: 80%;
+}
+
+.msg.you {
+    background: #a2d5f2;
+    align-self: flex-end;
+}
+
+.msg.other {
+    background: #ffd3b6;
+    align-self: flex-start;
+}
+
+.system {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+}
+
+#chatInputBox {
+    display: flex;
+    gap: 5px;
 }
 
 #chatInput {
-    padding: 5px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
+    flex: 1;
+    font-size: 16px;
+}
+
+#sendBtn {
+    background: #ffcc00;
+    flex-shrink: 0;
 }
 </style>
 </head>
 <body>
 
 <div id="nameScreen">
-    <h2>Válassz nevet</h2>
-    <input id="nameInput" placeholder="Írd be a neved">
-    <br>
-    <button onclick="startGame()">Indítás</button>
+    <h2>Írd be a neved</h2>
+    <input id="nameInput" placeholder="Név" style="width:100%;">
+    <br><br>
+    <button style="width:100%;" onclick="joinChat()">Belépés</button>
 </div>
 
-<button id="chatButton" onclick="toggleChat()">💬 Chat</button>
-<div id="chatPanel">
+<div id="chatScreen" style="display:none;">
     <div id="chatMessages"></div>
-    <input id="chatInput" placeholder="Írj üzenetet...">
+    <div id="chatInputBox">
+        <input id="chatInput" placeholder="Írj üzenetet...">
+        <button id="sendBtn">➤</button>
+    </div>
 </div>
 
 <script>
-let socket, cursors, players = {}, myId;
-let speed = 3;
+let socket;
+let myName = "";
 
-function startGame() {
-    const name = document.getElementById("nameInput").value.trim();
+function joinChat() {
+    myName = document.getElementById("nameInput").value.trim() || "Névtelen";
     document.getElementById("nameScreen").style.display = "none";
+    document.getElementById("chatScreen").style.display = "flex";
 
     socket = io();
-    socket.emit("setName", name || "Névtelen");
+    socket.emit("setName", myName);
 
-    const config = {
-        type: Phaser.AUTO,
-        width: window.innerWidth,
-        height: window.innerHeight,
-        backgroundColor: "#a2d5f2",
-        physics: { default: "arcade" },
-        scene: {
-            preload: function() {},
-            create: function() {
-                cursors = this.input.keyboard.createCursorKeys();
+    socket.on("systemMessage", (msg) => {
+        addSystemMessage(msg);
+    });
 
-                socket.on("currentPlayers", (serverPlayers) => {
-                    for (let id in serverPlayers) addPlayer(this, id, serverPlayers[id]);
-                });
+    socket.on("chatMessage", (data) => {
+        addMessage(data.name, data.text);
+    });
 
-                socket.on("newPlayer", (p) => addPlayer(this, p.id, p));
-
-                socket.on("playerMoved", (data) => {
-                    if (players[data.id]) {
-                        players[data.id].x = data.x;
-                        players[data.id].y = data.y;
-                    }
-                });
-
-                socket.on("playerLeft", (id) => {
-                    if (players[id]) {
-                        players[id].destroy();
-                        delete players[id];
-                    }
-                });
-
-                socket.on("chatMessage", (msg) => {
-                    const div = document.createElement("div");
-                    div.textContent = msg.name + ": " + msg.text;
-                    document.getElementById("chatMessages").appendChild(div);
-                    document.getElementById("chatMessages").scrollTop = document.getElementById("chatMessages").scrollHeight;
-                });
-
-                myId = socket.id;
-
-                document.getElementById("chatInput").addEventListener("keydown", (e) => {
-                    if (e.key === "Enter" && e.target.value.trim() !== "") {
-                        socket.emit("chatMessage", e.target.value.trim());
-                        e.target.value = "";
-                    }
-                });
-            },
-            update: function() {
-                if (!players[socket.id]) return;
-                let moved = false;
-                let player = players[socket.id];
-                if (cursors.left.isDown) { player.x -= speed; moved = true; }
-                if (cursors.right.isDown) { player.x += speed; moved = true; }
-                if (cursors.up.isDown) { player.y -= speed; moved = true; }
-                if (cursors.down.isDown) { player.y += speed; moved = true; }
-                if (moved) socket.emit("move", { x: player.x, y: player.y });
-            }
-        }
-    };
-    new Phaser.Game(config);
+    document.getElementById("sendBtn").onclick = sendMsg;
+    document.getElementById("chatInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendMsg();
+    });
 }
 
-function addPlayer(scene, id, data) {
-    let rect = scene.add.rectangle(data.x, data.y, 40, 40, Phaser.Display.Color.HexStringToColor(data.color).color);
-    scene.physics.add.existing(rect);
-    players[id] = rect;
+function sendMsg() {
+    let input = document.getElementById("chatInput");
+    let text = input.value.trim();
+    if (text !== "") {
+        socket.emit("chatMessage", text);
+        addMessage(myName, text, true);
+        input.value = "";
+    }
 }
 
-function toggleChat() {
-    const panel = document.getElementById("chatPanel");
-    panel.style.display = (panel.style.display === "flex") ? "none" : "flex";
+function addMessage(name, text, isYou = false) {
+    let div = document.createElement("div");
+    div.classList.add("msg", isYou ? "you" : "other");
+    div.innerHTML = `<strong>${name}:</strong> ${text}`;
+    document.getElementById("chatMessages").appendChild(div);
+    scrollChat();
+}
+
+function addSystemMessage(text) {
+    let div = document.createElement("div");
+    div.classList.add("system");
+    div.textContent = text;
+    document.getElementById("chatMessages").appendChild(div);
+    scrollChat();
+}
+
+function scrollChat() {
+    let chat = document.getElementById("chatMessages");
+    chat.scrollTop = chat.scrollHeight;
 }
 </script>
 </body>
