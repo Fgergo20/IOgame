@@ -1,74 +1,168 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Multiplayer .io Game</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
+<meta charset="UTF-8">
+<title>Cartoon .io Game</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+body {
+    margin: 0;
+    font-family: 'Comic Sans MS', sans-serif;
+    background: #2d2d2d;
+    overflow: hidden;
+}
+
+#nameScreen, #chatPanel {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border-radius: 15px;
+    padding: 20px;
+    text-align: center;
+    z-index: 100;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+#nameScreen {
+    top: 30%;
+}
+
+#nameInput {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 2px solid #aaa;
+}
+
+button {
+    background: #ffcc00;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 15px;
+    font-size: 16px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+#chatButton {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: #ff8800;
+    z-index: 50;
+}
+
+#chatPanel {
+    bottom: 70px;
+    width: 300px;
+    max-height: 300px;
+    display: none;
+    flex-direction: column;
+}
+
+#chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    text-align: left;
+    font-size: 14px;
+}
+
+#chatInput {
+    padding: 5px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+</style>
 </head>
 <body>
-<script>
-const socket = io();
 
-let players = {};
-let myId = null;
-let cursors;
+<div id="nameScreen">
+    <h2>Válassz nevet</h2>
+    <input id="nameInput" placeholder="Írd be a neved">
+    <br>
+    <button onclick="startGame()">Indítás</button>
+</div>
+
+<button id="chatButton" onclick="toggleChat()">💬 Chat</button>
+<div id="chatPanel">
+    <div id="chatMessages"></div>
+    <input id="chatInput" placeholder="Írj üzenetet...">
+</div>
+
+<script>
+let socket, cursors, players = {}, myId;
 let speed = 3;
 
-const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: "#2d2d2d",
-    physics: { default: "arcade" },
-    scene: {
-        preload: function() {},
-        create: function() {
-            cursors = this.input.keyboard.createCursorKeys();
+function startGame() {
+    const name = document.getElementById("nameInput").value.trim();
+    document.getElementById("nameScreen").style.display = "none";
 
-            socket.on("currentPlayers", (serverPlayers) => {
-                for (let id in serverPlayers) {
-                    addPlayer(this, id, serverPlayers[id]);
-                }
-            });
+    socket = io();
+    socket.emit("setName", name || "Névtelen");
 
-            socket.on("newPlayer", (player) => {
-                addPlayer(this, player.id, player);
-            });
+    const config = {
+        type: Phaser.AUTO,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundColor: "#a2d5f2",
+        physics: { default: "arcade" },
+        scene: {
+            preload: function() {},
+            create: function() {
+                cursors = this.input.keyboard.createCursorKeys();
 
-            socket.on("playerMoved", (data) => {
-                if (players[data.id]) {
-                    players[data.id].x = data.x;
-                    players[data.id].y = data.y;
-                }
-            });
+                socket.on("currentPlayers", (serverPlayers) => {
+                    for (let id in serverPlayers) addPlayer(this, id, serverPlayers[id]);
+                });
 
-            socket.on("playerLeft", (id) => {
-                if (players[id]) {
-                    players[id].destroy();
-                    delete players[id];
-                }
-            });
+                socket.on("newPlayer", (p) => addPlayer(this, p.id, p));
 
-            myId = socket.id;
-        },
-        update: function() {
-            if (!players[socket.id]) return;
+                socket.on("playerMoved", (data) => {
+                    if (players[data.id]) {
+                        players[data.id].x = data.x;
+                        players[data.id].y = data.y;
+                    }
+                });
 
-            let moved = false;
-            let player = players[socket.id];
+                socket.on("playerLeft", (id) => {
+                    if (players[id]) {
+                        players[id].destroy();
+                        delete players[id];
+                    }
+                });
 
-            if (cursors.left.isDown) { player.x -= speed; moved = true; }
-            if (cursors.right.isDown) { player.x += speed; moved = true; }
-            if (cursors.up.isDown) { player.y -= speed; moved = true; }
-            if (cursors.down.isDown) { player.y += speed; moved = true; }
+                socket.on("chatMessage", (msg) => {
+                    const div = document.createElement("div");
+                    div.textContent = msg.name + ": " + msg.text;
+                    document.getElementById("chatMessages").appendChild(div);
+                    document.getElementById("chatMessages").scrollTop = document.getElementById("chatMessages").scrollHeight;
+                });
 
-            if (moved) {
-                socket.emit("move", { x: player.x, y: player.y });
+                myId = socket.id;
+
+                document.getElementById("chatInput").addEventListener("keydown", (e) => {
+                    if (e.key === "Enter" && e.target.value.trim() !== "") {
+                        socket.emit("chatMessage", e.target.value.trim());
+                        e.target.value = "";
+                    }
+                });
+            },
+            update: function() {
+                if (!players[socket.id]) return;
+                let moved = false;
+                let player = players[socket.id];
+                if (cursors.left.isDown) { player.x -= speed; moved = true; }
+                if (cursors.right.isDown) { player.x += speed; moved = true; }
+                if (cursors.up.isDown) { player.y -= speed; moved = true; }
+                if (cursors.down.isDown) { player.y += speed; moved = true; }
+                if (moved) socket.emit("move", { x: player.x, y: player.y });
             }
         }
-    }
-};
+    };
+    new Phaser.Game(config);
+}
 
 function addPlayer(scene, id, data) {
     let rect = scene.add.rectangle(data.x, data.y, 40, 40, Phaser.Display.Color.HexStringToColor(data.color).color);
@@ -76,7 +170,10 @@ function addPlayer(scene, id, data) {
     players[id] = rect;
 }
 
-new Phaser.Game(config);
+function toggleChat() {
+    const panel = document.getElementById("chatPanel");
+    panel.style.display = (panel.style.display === "flex") ? "none" : "flex";
+}
 </script>
 </body>
 </html>
