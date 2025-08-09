@@ -7,50 +7,30 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static("public"));
 
-let players = {};
+let users = {}; // socket.id -> name
 
 io.on("connection", (socket) => {
-    console.log("Új játékos csatlakozott:", socket.id);
+    console.log("Új felhasználó:", socket.id);
 
-    // név beállítása
     socket.on("setName", (name) => {
-        players[socket.id] = {
-            x: 100, y: 100,
-            color: getRandomColor(),
-            name: name || "Névtelen"
-        };
-        socket.emit("currentPlayers", players);
-        socket.broadcast.emit("newPlayer", { id: socket.id, ...players[socket.id] });
+        users[socket.id] = name || "Névtelen";
+        io.emit("systemMessage", `${users[socket.id]} csatlakozott a chathez`);
     });
 
-    // mozgás
-    socket.on("move", (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            io.emit("playerMoved", { id: socket.id, x: data.x, y: data.y });
-        }
-    });
-
-    // chat
     socket.on("chatMessage", (msg) => {
-        if (players[socket.id]) {
-            io.emit("chatMessage", { name: players[socket.id].name, text: msg });
+        if (users[socket.id]) {
+            io.emit("chatMessage", { name: users[socket.id], text: msg });
         }
     });
 
-    // lelépés
     socket.on("disconnect", () => {
-        console.log("Játékos lelépett:", socket.id);
-        delete players[socket.id];
-        io.emit("playerLeft", socket.id);
+        if (users[socket.id]) {
+            io.emit("systemMessage", `${users[socket.id]} kilépett`);
+            delete users[socket.id];
+        }
     });
 });
 
 http.listen(PORT, () => {
-    console.log(`Szerver fut a ${PORT} porton`);
+    console.log(`Chat szerver fut a ${PORT} porton`);
 });
-
-function getRandomColor() {
-    return "#" + Math.floor(Math.random() * 16777215).toString(16);
-}
