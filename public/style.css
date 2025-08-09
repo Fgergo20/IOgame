@@ -10,7 +10,7 @@ body {
     color: #eee;
 }
 
-#nameScreen, #chatScreen {
+#nameScreen {
     background: #11172d; /* sötét kékes fekete */
     border-radius: 15px;
     padding: 20px;
