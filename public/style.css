@@ -55,14 +55,14 @@ button {
 }
 
 #chatScreen {
-    background: #11172d; /* sötét kékes fekete */
+    background: #11172d;
     border-radius: 15px;
-    padding: 20px;
+    padding: 0; /* vagy pl. 10px, de ne legyen túl nagy */
     width: 95%;
     max-width: 500px;
-    /* box-shadow eltávolítva */
     box-sizing: border-box;
 }
+
 
 
 #chatMessages {
