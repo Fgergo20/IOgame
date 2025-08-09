@@ -1,177 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="hu">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Cartoon Chat</title>
+<link rel="stylesheet" href="style.css" />
 <script src="/socket.io/socket.io.js"></script>
-<style>
-body {
-    margin: 0;
-    font-family: 'Comic Sans MS', sans-serif;
-    background: #f7f0d9;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-#nameScreen, #chatScreen {
-    background: #fff;
-    border-radius: 15px;
-    padding: 20px;
-    width: 95%;
-    max-width: 500px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-#nameScreen {
-    text-align: center;
-}
-
-input, button {
-    padding: 12px;
-    font-size: 16px;
-    border-radius: 10px;
-    border: none;
-    box-sizing: border-box;
-}
-
-button {
-    background: #ffcc00;
-    cursor: pointer;
-}
-
-#chatScreen {
-    display: flex;
-    flex-direction: column;
-    height: 90vh;
-}
-
-#chatMessages {
-    flex: 1;
-    overflow-y: auto;
-    background: #fff8e1;
-    border-radius: 10px;
-    padding: 10px;
-    margin-bottom: 10px;
-    display: flex;
-    flex-direction: column;
-}
-
-.msg {
-    padding: 8px 10px;
-    margin: 5px 0;
-    border-radius: 8px;
-    word-break: break-word;
-    max-width: 80%;
-}
-
-.msg.you {
-    background: #a2d5f2;
-    align-self: flex-end;
-}
-
-.msg.other {
-    background: #ffd3b6;
-    align-self: flex-start;
-}
-
-.system {
-    text-align: center;
-    font-size: 12px;
-    color: #888;
-}
-
-#chatInputBox {
-    display: flex;
-    gap: 5px;
-}
-
-#chatInput {
-    flex: 1;
-    font-size: 16px;
-}
-
-#sendBtn {
-    background: #ffcc00;
-    flex-shrink: 0;
-}
-</style>
 </head>
 <body>
 
 <div id="nameScreen">
     <h2>Írd be a neved</h2>
-    <input id="nameInput" placeholder="Név" style="width:100%;">
-    <br><br>
-    <button style="width:100%;" onclick="joinChat()">Belépés</button>
+    <input id="nameInput" placeholder="Név" autocomplete="off" />
+    <br /><br />
+    <button id="joinBtn">Belépés</button>
 </div>
 
 <div id="chatScreen" style="display:none;">
     <div id="chatMessages"></div>
-    <div id="chatInputBox">
-        <input id="chatInput" placeholder="Írj üzenetet...">
-        <button id="sendBtn">➤</button>
-    </div>
 </div>
 
-<script>
-let socket;
-let myName = "";
+<div id="chatInputBox" style="display:none;">
+    <input id="chatInput" placeholder="Írj üzenetet..." autocomplete="off" />
+    <button id="sendBtn">➤</button>
+</div>
 
-function joinChat() {
-    myName = document.getElementById("nameInput").value.trim() || "Névtelen";
-    document.getElementById("nameScreen").style.display = "none";
-    document.getElementById("chatScreen").style.display = "flex";
-
-    socket = io();
-    socket.emit("setName", myName);
-
-    socket.on("systemMessage", (msg) => {
-        addSystemMessage(msg);
-    });
-
-    socket.on("chatMessage", (data) => {
-        addMessage(data.name, data.text);
-    });
-
-    document.getElementById("sendBtn").onclick = sendMsg;
-    document.getElementById("chatInput").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") sendMsg();
-    });
-}
-
-function sendMsg() {
-    let input = document.getElementById("chatInput");
-    let text = input.value.trim();
-    if (text !== "") {
-        socket.emit("chatMessage", text);
-        addMessage(myName, text, true);
-        input.value = "";
-    }
-}
-
-function addMessage(name, text, isYou = false) {
-    let div = document.createElement("div");
-    div.classList.add("msg", isYou ? "you" : "other");
-    div.innerHTML = `<strong>${name}:</strong> ${text}`;
-    document.getElementById("chatMessages").appendChild(div);
-    scrollChat();
-}
-
-function addSystemMessage(text) {
-    let div = document.createElement("div");
-    div.classList.add("system");
-    div.textContent = text;
-    document.getElementById("chatMessages").appendChild(div);
-    scrollChat();
-}
-
-function scrollChat() {
-    let chat = document.getElementById("chatMessages");
-    chat.scrollTop = chat.scrollHeight;
-}
-</script>
+<script src="script.js"></script>
 </body>
 </html>
